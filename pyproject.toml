@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spilldict"
+version = "1.0.0"
+description = "A library that automatically offloads large bytes objects stored in a dictionary to SQLite, reducing memory usage. It can be used with the same syntax as a regular dict."
+readme = "README.en.md"
+license = "MIT"
+authors = [
+    {name = "llinghyami"},
+]
+requires-python = ">=3.10"
+dependencies = [
+    "sqlite-utils",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/llinghyami/spilldict"
+Repository = "https://github.com/llinghyami/spilldict.git"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spilldict*"]
