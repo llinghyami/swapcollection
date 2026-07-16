@@ -1,20 +1,20 @@
 > [English (English)](README.en.md) · **日本語**
 
-# spilldict
+# swapcollection
 
-辞書型に格納された大容量の `bytes` を自動的にSQLiteへ退避し、メモリ使用量を削減するライブラリです。通常の `dict` と同じ書き方で使用できます。
+辞書型やリストに格納された大容量のオブジェクトを自動的にSQLiteへ退避し、メモリ使用量を削減するライブラリです。通常の `dict` / `list` と同じ書き方で使用できます。
 
 ## クイックスタート
 
 ```bash
-pip install spilldict
+pip install swapcollection
 ```
 
 ```python
-from spilldict import SpillDict
+from swapcollection import SwapDict, SwapList
 
-# 1 KB以上のbytesをSQLiteへ退避
-data = SpillDict("cache.db", binary_size=1024)
+# 1 MB以上の値をSQLiteへ退避
+data = SwapDict(size_threshold=1024)
 
 data["small"] = b"hello"
 data["large"] = b"x" * 100_000
@@ -26,23 +26,22 @@ print(len(data["large"]))
 
 ## 仕組み
 
-`SpillDict` は、格納された値が `bytes` であり、そのサイズが `binary_size` 以上の場合に、値をSQLiteへ自動的に退避します。
+`SwapDict` / `SwapList` は、格納された値を pickle したサイズが `size_threshold` 以上の場合に、値をSQLiteへ自動的に退避します。`bytes` に限らず、任意のpickle可能なオブジェクトが対象です。
 
 | 値 | 保存先 |
 |---|---|
-| `binary_size` 未満の `bytes` | メモリ |
-| `binary_size` 以上の `bytes` | SQLite |
-| `bytes` 以外の値 | メモリ |
+| pickleサイズ < `size_threshold` | メモリ |
+| pickleサイズ >= `size_threshold` | SQLite |
 
-SQLiteへ退避された値も、通常の `dict` と同じ方法で取得、更新、削除できます。
+SQLiteへ退避された値も、通常の `dict` / `list` と同じ方法で取得、更新、削除できます。
 
 ## 注意事項
 
-- `binary_size` は、SQLiteへ退避する `bytes` のサイズをバイト単位で指定します。
-- サイズが `binary_size` と等しい `bytes` もSQLiteへ退避されます。
-- `binary_size` はインスタンス作成後に変更できません。
-- `bytes` 以外の値は、サイズにかかわらずメモリに保存されます。
-- SQLiteデータベースを削除すると、退避済みの値を取得できなくなり、`KeyError` が発生します。
+- `size_threshold` は、SQLiteへ退避する pickle サイズの閾値をバイト単位で指定します。
+- サイズが `size_threshold` と等しい値もSQLiteへ退避されます。
+- `size_threshold` はインスタンス作成後に変更できません。
+- 値の種類（`bytes` 以外も含む）は pickle サイズでのみ判断されます。
+- SQLiteデータベースを削除すると、退避済みの値を取得できなくなり、エラーが発生します。
 
 ## ライセンス
 

@@ -1,21 +1,22 @@
 > **English** · [日本語 (Japanese)](README.md)
 
-# spilldict
+# swapcollection
 
-A `dict` subclass that automatically spills large `bytes` values to SQLite,
-keeping memory usage low while maintaining the familiar `dict` interface.
+A library that automatically offloads large objects stored in a
+`dict`/`list` to SQLite, reducing memory usage. It can be used with
+the same syntax as a regular `dict`/`list`.
 
 ## Quick Start
 
 ```bash
-pip install spilldict
+pip install swapcollection
 ```
 
 ```python
-from spilldict import SpillDict
+from swapcollection import SwapDict, SwapList
 
-# Spill bytes >= 1 KB to SQLite
-data = SpillDict("cache.db", binary_size=1024)
+# Spill values >= 1 MB (pickle size) to SQLite
+data = SwapDict(size_threshold=1024)
 
 data["small"] = b"hello"
 data["large"] = b"x" * 100_000
@@ -27,25 +28,25 @@ print(len(data["large"]))
 
 ## How It Works
 
-`SpillDict` automatically offloads `bytes` values that meet or exceed
-`binary_size` to a SQLite database.
+`SwapDict` / `SwapList` automatically offloads values whose pickled size
+meets or exceeds `size_threshold` to a SQLite database. Any pickle-able
+object (not just `bytes`) is eligible.
 
 | Value | Storage |
 |---|---|
-| `bytes` < `binary_size` | In-memory |
-| `bytes` >= `binary_size` | SQLite (transparent) |
-| Non-`bytes` values | In-memory |
+| Pickle size < `size_threshold` | In-memory |
+| Pickle size >= `size_threshold` | SQLite (transparent) |
 
-Spilled values are retrieved, updated, and deleted using the same `dict`
+Spilled values are retrieved, updated, and deleted using the same `dict`/`list`
 interface — no special API calls needed.
 
 ## Caveats
 
-- `binary_size` is the threshold in bytes; values >= this size are spilled.
-- `binary_size` cannot be changed after instantiation.
-- Non-`bytes` values are always kept in memory, regardless of size.
-- Deleting the SQLite database will cause `KeyError` on previously spilled
-  keys.
+- `size_threshold` is the pickle-size threshold in bytes; values >= this size
+  are spilled.
+- `size_threshold` cannot be changed after instantiation.
+- Any pickle-able object type (not only `bytes`) can be spilled.
+- Deleting the SQLite database will cause errors on previously spilled items.
 
 ## License
 

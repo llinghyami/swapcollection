@@ -3,9 +3,9 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spilldict"
+name = "swapcollection"
 version = "1.0.0"
-description = "A library that automatically offloads large bytes objects stored in a dictionary to SQLite, reducing memory usage. It can be used with the same syntax as a regular dict."
+description = "A library that automatically offloads large pickle-able objects stored in a dict/list to SQLite, reducing memory usage. It can be used with the same syntax as a regular dict/list."
 readme = "README.en.md"
 license = "MIT"
 authors = [
@@ -20,9 +20,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/llinghyami/spilldict"
-Repository = "https://github.com/llinghyami/spilldict.git"
+Homepage = "https://github.com/llinghyami/swapcollection"
+Repository = "https://github.com/llinghyami/swapcollection.git"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["spilldict*"]
+include = ["swapcollection*"]
