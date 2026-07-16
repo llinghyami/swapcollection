@@ -94,9 +94,22 @@ class SwapList(UserList):
         raise NotFoundError(f"id {id} not found")
 
     def __setitem__(self, i, value):
+        if isinstance(i, slice):
+            processed = []
+            for v in value:
+                if len(pickle.dumps(v)) >= self.size_threshold:
+                    v = self._setprocess(v)
+                processed.append(v)
+            return super().__setitem__(i, processed)
         if len(pickle.dumps(value)) >= self.size_threshold:
             value = self._setprocess(value)
         return super().__setitem__(i, value)
+
+    def __eq__(self, other):
+        try:
+            return list(self) == list(other)
+        except TypeError:
+            return NotImplemented
     
     def __getitem__(self, i):
         value = super().__getitem__(i)

@@ -567,3 +567,440 @@ class TestSwapListBoundary:
         xs.append(b"")
         assert self._is_spilled(xs, 0)
         assert xs[0] == b""
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: __iter__, __reversed__
+# ---------------------------------------------------------------------------
+
+class TestSwapDictIteration:
+    def test_iter_keys(self):
+        d = SD({"a": 1, "b": 2, "c": 3})
+        assert set(iter(d)) == {"a", "b", "c"}
+
+    def test_iter_with_spilled_values(self):
+        d = SD(size_threshold=100)
+        d["x"] = b"x" * 500
+        d["y"] = 42
+        d["z"] = "hello"
+        assert set(iter(d)) == {"x", "y", "z"}
+
+    def test_reversed(self):
+        """UserDict does not support reversed(); iteration order is insertion order."""
+        d = SD({"a": 1, "b": 2, "c": 3})
+        keys = [k for k in d]
+        assert keys == ["a", "b", "c"]
+
+    def test_list_conversion(self):
+        d = SD({"a": 1, "b": 2, "c": 3})
+        assert sorted(d) == ["a", "b", "c"]
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: __repr__
+# ---------------------------------------------------------------------------
+
+class TestSwapDictRepr:
+    def test_repr_all_in_memory(self):
+        d = SD({"a": 1, "b": "hello"})
+        r = repr(d)
+        assert "'a': 1" in r
+        assert "'b': 'hello'" in r
+
+    def test_repr_with_spilled_values(self):
+        d = SD(size_threshold=100)
+        d["k"] = b"x" * 500
+        r = repr(d)
+        assert "k" in r
+        assert repr(b"x" * 500) in r  # value should be resolved
+
+    def test_repr_empty(self):
+        assert repr(SD()) == "{}"
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: __eq__
+# ---------------------------------------------------------------------------
+
+class TestSwapDictEquality:
+    def test_eq_regular_dict(self):
+        d = SD({"a": 1, "b": 2})
+        assert d == {"a": 1, "b": 2}
+
+    def test_eq_swap_dict(self):
+        d1 = SD({"a": 1, "b": 2})
+        d2 = SD({"a": 1, "b": 2})
+        assert d1 == d2
+
+    def test_eq_with_spilled_values(self):
+        d1 = SD(size_threshold=100)
+        d2 = SD(size_threshold=100)
+        val = b"x" * 500
+        d1["k"] = val
+        d2["k"] = val
+        assert d1 == d2
+
+    def test_eq_with_regular_dict_spilled(self):
+        d = SD(size_threshold=100)
+        val = b"x" * 500
+        d["k"] = val
+        assert d == {"k": val}
+
+    def test_not_equal(self):
+        d = SD({"a": 1})
+        assert d != {"a": 2}
+        assert d != {}
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: update variants
+# ---------------------------------------------------------------------------
+
+class TestSwapDictUpdate:
+    def test_update_with_kwargs(self):
+        d = SD(size_threshold=100)
+        big = b"x" * 500
+        d.update(a=1, b=big)
+        assert d["a"] == 1
+        assert d["b"] == big
+
+    def test_update_with_swap_dict(self):
+        d1 = SD(size_threshold=100)
+        d1["a"] = b"x" * 500
+        d2 = SD(size_threshold=100)
+        d2.update(d1)
+        assert d2["a"] == b"x" * 500
+
+    def test_update_overwrites_existing(self):
+        d = SD(size_threshold=100)
+        d["k"] = "old"
+        d.update(k=b"x" * 500)
+        assert d["k"] == b"x" * 500
+
+    def test_update_empty(self):
+        d = SD({"a": 1})
+        d.update({})
+        assert d["a"] == 1
+        assert len(d) == 1
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: fromkeys
+# ---------------------------------------------------------------------------
+
+class TestSwapDictFromKeys:
+    def test_fromkeys_simple(self):
+        d = SwapDict.fromkeys(["a", "b", "c"], 42)
+        assert d["a"] == 42
+        assert d["b"] == 42
+        assert d["c"] == 42
+        assert len(d) == 3
+
+    def test_fromkeys_spilled_default(self):
+        big = b"x" * 500
+        d = SwapDict.fromkeys(["k"], big)
+        assert d["k"] == big
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: __or__ / __ior__ / __ror__  (Python 3.9+)
+# ---------------------------------------------------------------------------
+
+class TestSwapDictMerge:
+    def test_or_with_dict(self):
+        d = SD({"a": 1}, size_threshold=100)
+        big = b"x" * 500
+        merged = d | {"b": big}
+        assert merged["a"] == 1
+        assert merged["b"] == big
+
+    def test_ior_with_dict(self):
+        d = SD(size_threshold=100)
+        big = b"x" * 500
+        d |= {"a": 1, "b": big}
+        assert d["a"] == 1
+        assert d["b"] == big
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: iteration helpers with spilled values
+# ---------------------------------------------------------------------------
+
+class TestSwapDictIterHelpers:
+    def test_keys_all_spilled(self):
+        d = SD(size_threshold=100)
+        d["a"] = b"x" * 500
+        d["b"] = b"y" * 500
+        assert set(d.keys()) == {"a", "b"}
+
+    def test_values_all_spilled(self):
+        d = SD(size_threshold=100)
+        d["a"] = b"x" * 500
+        d["b"] = b"y" * 500
+        vals = list(d.values())
+        assert len(vals) == 2
+        assert b"x" * 500 in vals
+        assert b"y" * 500 in vals
+
+    def test_items_all_spilled(self):
+        d = SD(size_threshold=100)
+        d["a"] = b"x" * 500
+        d["b"] = 42
+        items = list(d.items())
+        assert ("a", b"x" * 500) in items
+        assert ("b", 42) in items
+
+    def test_items_are_independent(self):
+        """items() returns resolved copies, not live references."""
+        d = SD(size_threshold=100)
+        d["k"] = b"x" * 500
+        for _k, v in d.items():
+            pass
+        assert d["k"] == b"x" * 500  # still accessible
+
+
+# ---------------------------------------------------------------------------
+# SwapDict: integer / tuple keys (not just strings)
+# ---------------------------------------------------------------------------
+
+class TestSwapDictKeyTypes:
+    def test_int_keys(self):
+        d = SD(size_threshold=100)
+        d[1] = "one"
+        d[2] = b"x" * 500
+        assert d[1] == "one"
+        assert d[2] == b"x" * 500
+
+    def test_tuple_keys(self):
+        d = SD(size_threshold=100)
+        d[(1, 2)] = "value"
+        assert d[(1, 2)] == "value"
+
+
+# ---------------------------------------------------------------------------
+# SwapList: slice operations
+# ---------------------------------------------------------------------------
+
+class TestSwapListSlice:
+    def test_get_slice_in_memory(self):
+        xs = SL([1, 2, 3, 4, 5])
+        assert xs[1:4] == [2, 3, 4]
+
+    def test_get_slice_with_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.extend([1, b"x" * 500, 3, b"y" * 500, 5])
+        sl = xs[1:4]
+        assert sl[0] == b"x" * 500
+        assert sl[1] == 3
+        assert sl[2] == b"y" * 500
+        assert len(sl) == 3
+
+    def test_get_slice_step(self):
+        xs = SL([1, 2, 3, 4, 5])
+        assert xs[::2] == [1, 3, 5]
+
+    def test_get_slice_negative(self):
+        xs = SL([1, 2, 3, 4, 5])
+        assert xs[-3:-1] == [3, 4]
+
+    def test_set_slice_with_list(self):
+        xs = SL([1, 2, 3, 4, 5])
+        xs[1:4] = [99, 100]
+        assert list(xs) == [1, 99, 100, 5]
+
+    def test_set_slice_with_spilled(self):
+        xs = SL([1, 2, 3], size_threshold=100)
+        xs[1:2] = [b"x" * 500, b"y" * 500]
+        assert xs[0] == 1
+        assert xs[1] == b"x" * 500
+        assert xs[2] == b"y" * 500
+        assert xs[3] == 3
+
+    def test_del_slice(self):
+        xs = SL([1, 2, 3, 4, 5])
+        del xs[1:3]
+        assert list(xs) == [1, 4, 5]
+
+    def test_get_slice_empty(self):
+        xs = SL([1, 2, 3])
+        assert xs[5:10] == []
+
+
+# ---------------------------------------------------------------------------
+# SwapList: __eq__
+# ---------------------------------------------------------------------------
+
+class TestSwapListEquality:
+    def test_eq_regular_list(self):
+        xs = SL([1, 2, 3])
+        assert xs == [1, 2, 3]
+
+    def test_eq_swap_list(self):
+        xs1 = SL([1, 2, 3])
+        xs2 = SL([1, 2, 3])
+        assert xs1 == xs2
+
+    def test_eq_with_spilled(self):
+        xs1 = SL(size_threshold=100)
+        xs2 = SL(size_threshold=100)
+        xs1.extend([1, b"x" * 500])
+        xs2.extend([1, b"x" * 500])
+        assert xs1 == xs2
+
+    def test_eq_regular_list_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.extend([1, b"x" * 500])
+        assert xs == [1, b"x" * 500]
+
+    def test_not_equal(self):
+        xs = SL([1, 2, 3])
+        assert xs != [1, 2]
+        assert xs != [1, 2, 4]
+
+
+# ---------------------------------------------------------------------------
+# SwapList: __repr__
+# ---------------------------------------------------------------------------
+
+class TestSwapListRepr:
+    def test_repr_in_memory(self):
+        xs = SL([1, "hello", 3])
+        r = repr(xs)
+        assert "1" in r and "hello" in r and "3" in r
+
+    def test_repr_with_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.append(b"x" * 500)
+        r = repr(xs)
+        assert repr(b"x" * 500) in r
+
+    def test_repr_empty(self):
+        assert repr(SL()) == "[]"
+
+
+# ---------------------------------------------------------------------------
+# SwapList: __radd__
+# ---------------------------------------------------------------------------
+
+class TestSwapListRAdd:
+    def test_radd_regular_list(self):
+        xs = SL([3, 4], size_threshold=100)
+        ys = [1, 2] + xs
+        assert ys == [1, 2, 3, 4]
+
+    def test_radd_with_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.append(b"x" * 500)
+        ys = [1] + xs
+        assert ys[0] == 1
+        assert ys[1] == b"x" * 500
+
+
+# ---------------------------------------------------------------------------
+# SwapList: negative indexing
+# ---------------------------------------------------------------------------
+
+class TestSwapListNegativeIndex:
+    def test_get_negative(self):
+        xs = SL([1, 2, 3])
+        assert xs[-1] == 3
+        assert xs[-2] == 2
+        assert xs[-3] == 1
+
+    def test_get_negative_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.extend([1, b"x" * 500, 3])
+        assert xs[-1] == 3
+        assert xs[-2] == b"x" * 500
+        assert xs[-3] == 1
+
+    def test_set_negative(self):
+        xs = SL([1, 2, 3], size_threshold=100)
+        xs[-1] = b"x" * 500
+        assert xs[-1] == b"x" * 500
+
+
+# ---------------------------------------------------------------------------
+# SwapList: insert spilled at various positions
+# ---------------------------------------------------------------------------
+
+class TestSwapListInsertVariants:
+    def test_insert_end_large(self):
+        xs = SL([1, 2], size_threshold=100)
+        xs.insert(2, b"x" * 500)
+        assert xs[2] == b"x" * 500
+        assert len(xs) == 3
+
+    def test_insert_negative(self):
+        xs = SL([1, 2, 3], size_threshold=100)
+        xs.insert(-1, b"x" * 500)  # before 3
+        assert xs[-2] == b"x" * 500
+        assert xs[-1] == 3
+
+
+# ---------------------------------------------------------------------------
+# SwapList: sort with mixed spilled + in-memory
+# ---------------------------------------------------------------------------
+
+class TestSwapListSortVariants:
+    def test_sort_with_spilled_values(self):
+        xs = SL(size_threshold=100)
+        xs.extend([b"c" * 500, b"a" * 500, b"b" * 500])
+        xs.sort()
+        assert xs[0] == b"a" * 500
+        assert xs[1] == b"b" * 500
+        assert xs[2] == b"c" * 500
+
+    def test_sort_reverse(self):
+        xs = SL([3, 1, 2])
+        xs.sort(reverse=True)
+        assert list(xs) == [3, 2, 1]
+
+
+# ---------------------------------------------------------------------------
+# SwapList: append / extend edge cases
+# ---------------------------------------------------------------------------
+
+class TestSwapListAppendExtend:
+    def test_append_multiple_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.append(b"x" * 500)
+        xs.append(b"y" * 500)
+        xs.append(b"z" * 500)
+        assert xs[0] == b"x" * 500
+        assert xs[1] == b"y" * 500
+        assert xs[2] == b"z" * 500
+        assert len(xs) == 3
+
+    def test_extend_empty(self):
+        xs = SL([1, 2, 3])
+        xs.extend([])
+        assert list(xs) == [1, 2, 3]
+
+    def test_extend_generator(self):
+        xs = SL(size_threshold=100)
+        def gen():
+            yield 1
+            yield b"x" * 500
+            yield 2
+        xs.extend(gen())
+        assert xs[0] == 1
+        assert xs[1] == b"x" * 500
+        assert xs[2] == 2
+
+
+# ---------------------------------------------------------------------------
+# SwapList: __delitem__ slice
+# ---------------------------------------------------------------------------
+
+class TestSwapListDelSlice:
+    def test_del_slice_with_spilled(self):
+        xs = SL(size_threshold=100)
+        xs.extend([1, b"x" * 500, b"y" * 500, 4])
+        del xs[1:3]
+        assert list(xs) == [1, 4]
+
+    def test_del_all(self):
+        xs = SL([1, 2, 3])
+        del xs[:]
+        assert len(xs) == 0
