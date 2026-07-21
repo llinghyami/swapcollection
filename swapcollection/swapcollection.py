@@ -3,6 +3,7 @@ from sqlite_utils.db import NotFoundError
 import uuid
 from collections import UserDict, UserList
 import pickle
+import hashlib
 
 class SwapDict(UserDict):
     PREFIX = "swapdict_"
@@ -25,13 +26,16 @@ class SwapDict(UserDict):
         super().__init__(data) # 内部で__setitem__を呼んで処理するので、ここでは何もしない
 
     def _setprocess(self, value):
-        id = self.PREFIX + str(uuid.uuid4())
-        self.table.insert({"id": id, "value": pickle.dumps(value)})
+        b = pickle.dumps(value)
+        id = self.PREFIX + str(uuid.uuid4().hex) + "_" + hashlib.sha256(b).hexdigest()
+        self.table.insert({"id": id, "value": b})
         return str(id)
 
     def _getprocess(self, id):
         result = self.table.get(id)
         if result:
+            if hashlib.sha256(result["value"]).hexdigest() != id.split("_")[-1]:
+                raise RuntimeError("hash mismatch")
             return pickle.loads(result["value"])
         raise NotFoundError(f"id {id} not found")
 
@@ -83,13 +87,16 @@ class SwapList(UserList):
         super().__init__(tmp_data)
 
     def _setprocess(self, value):
-        id = self.PREFIX + str(uuid.uuid4())
-        self.table.insert({"id": id, "value": pickle.dumps(value)})
-        return id
+        b = pickle.dumps(value)
+        id = self.PREFIX + str(uuid.uuid4().hex) + "_" + hashlib.sha256(b).hexdigest()
+        self.table.insert({"id": id, "value": b})
+        return str(id)
 
     def _getprocess(self, id):
         result = self.table.get(id)
         if result:
+            if hashlib.sha256(result["value"]).hexdigest() != id.split("_")[-1]:
+                raise RuntimeError("hash mismatch")
             return pickle.loads(result["value"])
         raise NotFoundError(f"id {id} not found")
 
@@ -212,6 +219,7 @@ if __name__ == "__main__":
     tmp.extend([{"hello": "world"}, testobj, 1977])
     tmp[2:4] = ["hello", {"hello": "world"}, testobj, 1977]
     print(tmp)
+    print(tmp.data)
 
 
     for i in tmp:

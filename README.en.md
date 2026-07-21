@@ -126,6 +126,17 @@ object (not just `bytes`) is eligible.
 Spilled values are retrieved, updated, and deleted using the same `dict`/`list`
 interface — no special API calls needed.
 
+## Integrity
+
+Each spilled value is stored alongside a SHA-256 hash of its pickled bytes,
+embedded directly in the spill ID. On retrieval, the hash is verified:
+
+- If the database row was tampered with or corrupted after storage, a
+  `RuntimeError("hash mismatch")` is raised immediately.
+- This protects against **undetected** SQLite corruption or external
+  manipulation of stored values — the integrity of the data you store is
+  checked every time you access it.
+
 ## Caveats
 
 - `size_threshold` is the pickle-size threshold in bytes; values >= this size
