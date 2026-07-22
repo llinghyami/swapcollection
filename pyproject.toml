@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "swapcollection"
-version = "1.1.0"
+version = "1.1.1"
 description = "A library that automatically offloads large pickle-able objects stored in a dict/list to SQLite, reducing memory usage. It can be used with the same syntax as a regular dict/list."
 readme = "README.en.md"
 license = "MIT"

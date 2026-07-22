@@ -10,12 +10,10 @@ class SwapDict(UserDict):
     PATH = "swapcollections_cache.db"
         
     def __init__(self, data={}, size_threshold: int = 1048576):
-        self.db = Database(self.PATH)
-        self.table = self.db["DICT"]
         self.size_threshold = size_threshold
 
-        if not self.table.exists():
-            self.table.create(
+        if not Database(self.PATH)["DICT"].exists():
+            Database(self.PATH)["DICT"].create(
                 {
                     "id": str,
                     "value": bytes,
@@ -28,11 +26,11 @@ class SwapDict(UserDict):
     def _setprocess(self, value):
         b = pickle.dumps(value)
         id = self.PREFIX + str(uuid.uuid4().hex) + "_" + hashlib.sha256(b).hexdigest()
-        self.table.insert({"id": id, "value": b})
+        Database(self.PATH)["DICT"].insert({"id": id, "value": b})
         return str(id)
 
     def _getprocess(self, id):
-        result = self.table.get(id)
+        result = Database(self.PATH)["DICT"].get(id)
         if result:
             if hashlib.sha256(result["value"]).hexdigest() != id.split("_")[-1]:
                 raise RuntimeError("hash mismatch")
@@ -65,17 +63,15 @@ class SwapList(UserList):
     PATH = "swapcollections_cache.db"
     
     def __init__(self, data=None, size_threshold: int = 1048576):
-        self.db = Database(self.PATH)
-        self.table = self.db["LIST"]
         self.size_threshold = size_threshold
 
-        if not self.table.exists():
-            self.table.create(
+        if not Database(self.PATH)["LIST"].exists():
+            Database(self.PATH)["LIST"].create(
                 {
                     "id": str,
                     "value": bytes,
                 },
-                pk="id",
+                pk="id"
             )
 
         tmp_data = []
@@ -89,11 +85,11 @@ class SwapList(UserList):
     def _setprocess(self, value):
         b = pickle.dumps(value)
         id = self.PREFIX + str(uuid.uuid4().hex) + "_" + hashlib.sha256(b).hexdigest()
-        self.table.insert({"id": id, "value": b})
+        Database(self.PATH)["LIST"].insert({"id": id, "value": b})
         return str(id)
 
     def _getprocess(self, id):
-        result = self.table.get(id)
+        result = Database(self.PATH)["LIST"].get(id)
         if result:
             if hashlib.sha256(result["value"]).hexdigest() != id.split("_")[-1]:
                 raise RuntimeError("hash mismatch")
@@ -194,49 +190,13 @@ class SwapList(UserList):
 
 if __name__ == "__main__":
 
-    class TestObj:
-        def __init__(self, a, b):
-            self.a = a
-            self.b = b
-            self.c = a + b
-        
-        def test(self):
-            return self.c
+    d = SwapDict({
+        "video": {
+            "init": None,
+            "chunks": SwapList([]),  # ← ここ
+            "type": None
+        },
+    })
 
-    testobj = TestObj(1, 2)
-
-    tmp = SwapList(
-        [
-            "hello", 
-            {"hello": "world"},
-            testobj,
-            1977,
-        ],
-        size_threshold=1,
-    )
-
-    tmp.append("hello")
-    tmp.extend([{"hello": "world"}, testobj, 1977])
-    tmp[2:4] = ["hello", {"hello": "world"}, testobj, 1977]
-    print(tmp)
-    print(tmp.data)
-
-
-    for i in tmp:
-        print(i)
-
-    # tmp2 = SwapList(
-    #     [
-    #         "small",
-    #         {"hello": "world"},
-    #         "large",
-    #         {"hello": "world", "hello": "world", "hello": "world"},
-    #     ],
-    #     size_threshold=1,
-    # )
-
-    # print(tmp2)
-    # print(tmp2[0])
-    # print(tmp2[1])
-    # print(tmp2[2])    
-    # print(tmp2[3])
+    for i in range(1000):
+        d["video"]["chunks"].append(b"a" * 1024 * 1024 * 10)
